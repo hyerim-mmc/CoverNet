@@ -1,0 +1,40 @@
+{
+    "DATASET" : {
+        "set" : "mini",     
+        "dataset_str" : "v1.0-mini",
+        "dataset_path" : "/home/hyerim/data/sets/nuscenes",
+        "intersection_use" : true
+    },
+
+    "LEARNING" : {
+        "device" : "cpu",
+        "lr" : 1e-4,
+        "momentum" : 0.9,
+        "n_epochs" : 50,
+        "num_modes" : 64,
+        "batch_size" : 2,
+        "val_batch_size" : 1,
+        "num_val_data" : 4,
+        "print_size" : 1,
+        "weight_path" : "./resnet50-19c8e357.pth",
+        "trajectory_set_path" : "./trajectory-sets/epsilon_8.pkl",
+        "model_save_path" : "./result/model"
+    },
+
+    "HISTORY" : {
+        "num_past_hist" : 6,                       
+        "num_future_hist" : 6
+    },
+
+    "PREPROCESS" : {
+        "show_imgs" : false,
+        "save_imgs" : false,
+        "img_layers_list" : ["drivable_area", "road_segment", "road_block", "lane", "road_divider", "lane_divider", "walkway"],
+        "resolution" : 0.1,                       
+        "meters_ahead" : 40,
+        "meters_behind" : 10,
+        "meters_left" : 25,
+        "meters_right" : 25,        
+        "num_max_agent" : 10
+    }
+}
