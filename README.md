@@ -1,4 +1,4 @@
-# Nuscenes Dataset processing & CoverNet Implementation
+# CoverNet Implementation
 This repository contains an implementation of [CoverNet](https://arxiv.org/pdf/1911.10298.pdf) and Nuscenes dataset processing.
 
 *Phan-Minh, Tung, et al. "Covernet: Multimodal behavior prediction using trajectory sets." Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. 2020.*
