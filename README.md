@@ -28,9 +28,8 @@ This repository contains an implementation of [CoverNet](https://arxiv.org/pdf/1
 6. Download Tensorboard ```pip install tensorboard``` or ```conda install tensorboard```
 
 ## Run
-Please check DATASET_PATH in advance!
-    - Download the [trajectory sets](https://www.nuscenes.org/public/nuscenes-prediction-challenge-trajectory-sets.zip)
-    - Write own parsing/learning configuration ```covernet_config.json```
-    - Run ```python train.py```
+1. Download the [trajectory sets](https://www.nuscenes.org/public/nuscenes-prediction-challenge-trajectory-sets.zip)
+2. Write own parsing/learning configuration ```covernet_config.json```
+3. Run ```python train.py```
     - Results will be saved in ```result``` folder
     - Check Tensorboard results using ```tensorboard --logdir=./result/tensorboard``` and click the website
