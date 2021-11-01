@@ -122,7 +122,9 @@ class NuSceneDataset_CoverNet(Dataset):
 
         #################################### State processing ####################################
         ego_instance_token, ego_sample_token = self.dataset[idx].split('_')
+        ego_annotation = self.helper.get_sample_annotation(ego_instance_token, ego_sample_token)
 
+        ego_pose = np.array(utils.get_pose_from_annot(ego_annotation))
         ego_vel = self.helper.get_velocity_for_agent(ego_instance_token, ego_sample_token)
         ego_accel = self.helper.get_acceleration_for_agent(ego_instance_token, ego_sample_token)
         ego_yawrate = self.helper.get_heading_change_rate_for_agent(ego_instance_token, ego_sample_token)
@@ -153,6 +155,7 @@ class NuSceneDataset_CoverNet(Dataset):
 
 
         return {'img'                  : img,                          # Type : torch.Tensor
+                'ego_cur_pos'          : ego_pose,                                                    # Type : np.array([global_x,globa_y,global_yaw])                        | Shape : (3, )
                 'ego_state'            : ego_states,                   # Type : np.array([[vel,accel,yaw_rate]]) --> local(ego's coord)   |   Unit : [m/s, m/s^2, rad/sec]    
                 'future_global_ego_pos': future_poses_m,               # Type : np.array([global_x, global_y, global_yaw]) .. ground truth data
                 'num_future_mask'      : num_future_mask,              # a number for masking future history

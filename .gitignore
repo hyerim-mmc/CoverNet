@@ -1,0 +1,7 @@
+.vscode
+__pycache__
+nuscenes-devkit
+result/model
+result/tensorboard
+trajectory-sets/*.pkl
+*.pth
