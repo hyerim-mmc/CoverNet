@@ -58,17 +58,26 @@ def save_maps(self, type, map, idx):
 
 def get_pose_from_annot(annotation) -> list:
     x, y, _ = annotation['translation']
-    yaw = quaternion_yaw(Quaternion(annotation['rotation']))
+    yaw = angle_of_rotation(quaternion_yaw(Quaternion(annotation['rotation'])))
     
     return [x, y, yaw]
 
+def angle_of_rotation(yaw: float) -> float:
+    """
+    Given a yaw angle (measured from x axis), find the angle needed to rotate by so that
+    the yaw is aligned with the y axis (pi / 2).
+    :param yaw: Radians. Output of quaternion_yaw function.
+    :return: Angle in radians.
+    """
+    return (np.pi / 2) + np.sign(-yaw) * np.abs(yaw)
+	
 def get_pose(annotation_list) -> np.ndarray:
     return np.array([get_pose_from_annot(ann) for ann in annotation_list])
 
 
 def rotation_global_to_local(yaw) -> np.ndarray:
-    return np.array([[ np.cos(yaw), np.sin(yaw)], \
-                [-np.sin(yaw), np.cos(yaw)]])
+    return np.array([[ np.cos(yaw), -np.sin(yaw)], \
+                [np.sin(yaw), np.cos(yaw)]])
 
 
 def angle_mod_2pi(angle):
@@ -98,4 +107,3 @@ def convert_global_to_local_forpose(global_pose_origin, global_pose) -> np.ndarr
     output = [local_xy[0], local_xy[1], local_yaw]
 
     return np.array(output)
-

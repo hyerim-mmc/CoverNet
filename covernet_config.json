@@ -17,13 +17,13 @@
         "num_val_data" : 4,
         "print_size" : 1,
         "weight_path" : "./resnet50-19c8e357.pth",
-        "trajectory_set_path" : "./trajectory-sets/epsilon_8.pkl",
+        "trajectory_set_path" : "./trajectory-sets/epsilon_2.pkl",
         "model_save_path" : "./result/model"
     },
 
     "HISTORY" : {
-        "num_past_hist" : 6,                       
-        "num_future_hist" : 6
+        "num_past_hist" : 12,                       
+        "num_future_hist" : 12
     },
 
     "PREPROCESS" : {

@@ -1,6 +1,7 @@
 import sys
 import os
 from typing import Dict, List, Tuple
+
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
 import cv2
@@ -39,6 +40,8 @@ class CoverNet_test:
         self.dataset = NuSceneDataset_CoverNet(train_mode=dataset_train_mode, config_file_name=config_file, verbose=verbose)
         self.rasterizer = AgentBoxesWithFadedHistory(self.helper, seconds_of_history=1)    
         
+        self.num_future_hist = self.config['HISTORY']['num_future_hist']         
+
         self.resolution = self.config['PREPROCESS']['resolution']         
         self.meters_ahead = self.config['PREPROCESS']['meters_ahead']
         self.meters_behind = self.config['PREPROCESS']['meters_behind']
@@ -52,77 +55,134 @@ class CoverNet_test:
             plt.plot(t[:,0],t[:,1])
         plt.show()
 
-    def convert_to_pixel_coords(self,
-                                location: Tuple[float, float],
-                                center_of_image_in_global: Tuple[float, float],
-                                center_of_image_in_pixels: Tuple[float, float],
-                                resolution: float = 0.1) -> Tuple[int, int]:
-        x, y = location
-        x_offset = (x - center_of_image_in_global[0])
-        y_offset = (y - center_of_image_in_global[1])
 
-        x_pixel = x_offset / resolution
+    def overlay_result(self, img, path_set, color = (255, 255, 0)): 
+        # print("path_set : ",path_set)
 
-        # Negate the y coordinate because (0, 0) is ABOVE and to the LEFT
-        y_pixel = -y_offset / resolution
-        print("location : ",location)
-        print("x_pixel : ", x_pixel)
-        print("y_pixel : ", y_pixel)
-        print("center_of_image_in_global :", center_of_image_in_global)
-        print("center_of_image_in_pixels :", center_of_image_in_pixels)
+        if type(path_set) == list:
+            print("Path_set type is List!")
+            print(path_set)
+            path_set = np.array(path_set)
+            # path to image coordinate transform (path is vehicle center coordinated)
+            path_u = (-path_set[:,1] + self.meters_left)/self.resolution
+            path_v = (self.meters_ahead -  path_set[:,0])/self.resolution
+            for i in range(len(path_v)):
+                cv2.circle(img, (int(path_u[i]), int(path_v[i])), 5, color, -1)
+                if i > 0:
+                    cv2.line(img,(prev_path_u, prev_path_v),(path_u[i], path_v[i]),color, 2 )
+                prev_path_u = int(path_u[i])
+                prev_path_v = int(path_v[i])
+                    
+        elif type(path_set) == torch.Tensor:
+            print("Path_set type is Tensor!")
+            for path_modes in path_set:
+                for path in path_modes:
+                    # path to image coordinate transform (path is vehicle center coordinated)
+                    path_u = (-path[1] + self.meters_left)/self.resolution
+                    path_u = path_u.int().detach().cpu().numpy()
+                    path_v = (self.meters_ahead -  path[0])/self.resolution
+                    path_v = path_v.int().detach().cpu().numpy()
+                    for i in range(len(path_v)):
+                        cv2.circle(img, (path_u[i], path_v[i]), 5, color, -1)
+                        if i > 0:
+                            cv2.line(img,(prev_path_u, prev_path_v),(path_u[i], path_v[i]),color, 2 )
+                        prev_path_u = path_u[i]
+                        prev_path_v = path_v[i]
+        return img
 
-        row_pixel = int(center_of_image_in_pixels[0] + y_pixel)
-        column_pixel = int(center_of_image_in_pixels[1] + x_pixel)
+    # def convert_to_pixel_coords(self,
+    #                             location: Tuple[float, float],
+    #                             center_of_image_in_global: Tuple[float, float],
+    #                             center_of_image_in_pixels: Tuple[float, float],
+    #                             resolution: float = 0.1) -> Tuple[int, int]:
+    #     x, y = location
+    #     x_offset = (x - center_of_image_in_global[0])
+    #     y_offset = (y - center_of_image_in_global[1])
 
-        return row_pixel, column_pixel
+    #     x_pixel = x_offset / resolution
+
+    #     # Negate the y coordinate because (0, 0) is ABOVE and to the LEFT
+    #     y_pixel = -y_offset / resolution
+
+    #     row_pixel = center_of_image_in_pixels[0] + y_pixel
+    #     column_pixel = center_of_image_in_pixels[1] + x_pixel
+
+    #     # row_pixel = list(map(int, row_pixel))   
+    #     # column_pixel = list(map(int, column_pixel))   
+    #     print("location : ", location)
+    #     print("center_of_image_in_global : ", center_of_image_in_global)
+
+    #     print("x_offset : ", x_offset)
+    #     print("row_pixel : ", row_pixel)
+    #     print("column_pixel : ", column_pixel)
+
+    #     return row_pixel, column_pixel
 
 
-    def draw_lanes_on_image(self, agent_pos: List,
-                                  image: np.ndarray,
-                                  lanes: Dict[str, List[Tuple[float, float, float]]],
-                                  mode):
-        if mode =="pred":
-            color = (255, 255, 0) # yellow
-        elif mode =="label":
-            color = (204, 0, 204) # violet
-        elif mode =="true":
-            color = (0, 0, 255) # red
+    # def draw_lanes_on_image(self, agent_pos: List,
+    #                               image: np.ndarray,
+    #                               lanes: Dict[str, List[Tuple[float, float, float]]],
+    #                               mode):
+    #     if mode =="pred":
+    #         color = (255, 255, 0) # yellow
+    #     elif mode =="label":
+    #         color = (204, 0, 204) # violet
+    #     elif mode =="true":
+    #         color = (0, 0, 255) # red
 
-        image_side_length = 2 * max(self.meters_ahead, self.meters_behind,
-                                    self.meters_left, self.meters_right)
-        image_side_length_pixels = int(image_side_length / self.resolution)
+    #     image_side_length = 2 * max(self.meters_ahead, self.meters_behind,
+    #                                 self.meters_left, self.meters_right)
+    #     image_side_length_pixels = int(image_side_length / self.resolution)
+    #     print("image_side_length_pixels : " , image_side_length_pixels)
 
-        image_side_length_pixels = int(image_side_length / self.resolution)
-        agent_pixels = [int(image_side_length_pixels / 2), int(image_side_length_pixels / 2)]
-        agent_global_coords = (agent_pos[0], agent_pos[1])
+    #     agent_pixels = [int(image_side_length_pixels / 2), int(image_side_length_pixels / 2)]
+    #     agent_global_coords = (agent_pos[0], agent_pos[1])
 
-        for poses_along_lane in lanes.values():
-            for start_pose, end_pose in zip(poses_along_lane[:-1], poses_along_lane[1:]):
-                start_pixels = self.convert_to_pixel_coords(start_pose[:2], agent_global_coords,
-                                                   agent_pixels, self.resolution)
-                end_pixels = self.convert_to_pixel_coords(end_pose[:2], agent_global_coords,
-                                                 agent_pixels, self.resolution)
+    #     for poses_along_lane in lanes.values():
+    #         for start_pose, end_pose in zip(poses_along_lane[:-1], poses_along_lane[1:]):
+    #             start_pixels = self.convert_to_pixel_coords(start_pose[:2], agent_global_coords,
+    #                                                agent_pixels, self.resolution)
+    #             end_pixels = self.convert_to_pixel_coords(end_pose[:2], agent_global_coords,
+    #                                              agent_pixels, self.resolution)
 
-                start_pixels = (start_pixels[1], start_pixels[0])
-                end_pixels = (end_pixels[1], end_pixels[0])
-
-                cv2.line(image, start_pixels, end_pixels, color, thickness=3)
-                
-        return image
-
+    #             start_pixel = (start_pixels[1], start_pixels[0])
+    #             end_pixel = (end_pixels[1], end_pixels[0])
+    #             print(start_pixel)
+    #             cv2.line(image, start_pixel, end_pixel, color, thickness=3)
+            
+    #     return image
 
     def traject_to_lane(self, traject):
-        ## Make trajectory to Dict[str, List[Tuple[float, float, float]]] form 
         str = 'lane'
         x = traject[:,0]
         y = traject[:,1]
-
-        lane = []
+        l = []
         for i in range(len(x)):
-            temp = (x[i], y[i], 0.0)
-            lane.append(temp)
+            t = (x[i],y[i],0)
+            l.append(t)
+        dic = {str:l}
         
-        return {str:lane}
+        return dic
+
+
+    def trajectories_to_lane(self, traject):
+        ## Make trajectory to Dict[str, List[Tuple[float, float, float]]] form 
+        output = {}
+
+        for i in range(np.shape(traject)[0]):
+            str = '{}'.format(i)
+            x = traject[i][:,0]
+            y = traject[i][:,1]
+            
+            lane = []
+            for j in range(len(x)):
+                temp = (x[j], y[j], 0.0)
+                lane.append(temp)
+
+            output[str] = lane
+
+        # print("output : ", output)
+        return output
 
 
     def run(self):
@@ -130,6 +190,7 @@ class CoverNet_test:
 
         self.model.eval()
         ego_pos = data['ego_cur_pos']
+        print("ego_pos : ", ego_pos)
         img_raw =  data['img'].detach().cpu().numpy()
         img_raw = np.ascontiguousarray(img_raw, dtype=np.uint8)
 
@@ -139,7 +200,7 @@ class CoverNet_test:
 
         prediction = self.model(img_tensor, agent_state_tensor)
         pred = F.softmax(prediction,dim=-1)
-        # print("pred :", pred.argmax())
+        # print("pred.argmax() :", pred.argmax())
         label = data['label']
         # print("label :", label)
 
@@ -147,20 +208,22 @@ class CoverNet_test:
         # pred_traj = self.trajectory_set[pred.argsort(descending=True)[:1]]       
         pred_traj = self.trajectory_set[pred.argmax()]
         label_traj = self.trajectory_set[label]
-        # print("pred_traj :", pred_traj)
-        # print("label_traj :", label_traj)
+        self.overlay_result(img_raw, pred_traj) 
 
-        pred_lane = self.traject_to_lane(np.array(pred_traj))
-        label_lane = self.traject_to_lane(np.array(label_traj))
+        # pred_lane = self.traject_to_lane(np.array(pred_traj))
+        # label_lane = self.traject_to_lane(np.array(label_traj))
         # real_lane = self.traject_to_lane(real)
+        # print("pred_lane :", pred_lane)
+        # print("label_lane :", label_lane)
+
 
         # result_img = self.draw_lanes_on_image(ego_pos, img_raw, pred_lane, 'pred')
         # result_img = self.draw_lanes_on_image(ego_pos, img_raw, label_lane, 'label')
-        # # result_img = self.draw_lanes_on_image(img_raw, real_lane, 'true', 0.1)
+        # result_img = self.draw_lanes_on_image(img_raw, real_lane, 'true', 0.1)
         # cv2.imshow("Result Comparison", result_img)
 
 
-        ## trajectory set plot 
+        ## trajectory set plot on axis 
         # self.draw_traj_set()
 
         traj_sets = []
@@ -168,11 +231,10 @@ class CoverNet_test:
             t = np.array(self.trajectory_set[i][:])
             traj_sets.append(t)
 
-        traj_sets = self.traject_to_lane(np.array(traj_sets))
-
-
-        traj_sets_img = self.draw_lanes_on_image(ego_pos, img_raw, traj_sets, 'pred')
-        cv2.imshow("Trajectory_sets", traj_sets_img)
+        traj_sets = self.trajectories_to_lane(np.array(traj_sets))
+        # print(traj_sets)
+        # traj_sets_img = self.draw_lanes_on_image(ego_pos, img_raw, traj_sets, 'pred')
+        # cv2.imshow("Trajectory_sets", traj_sets_img)
 
         cv2.waitKey(0)
         cv2.destroyAllWindows

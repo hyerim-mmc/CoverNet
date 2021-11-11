@@ -61,8 +61,8 @@ class NuSceneDataset_CoverNet(Dataset):
         self.meters_left = config['PREPROCESS']['meters_left']
         self.meters_right = config['PREPROCESS']['meters_right'] 
 
-        self.num_past_hist = int(config['HISTORY']['num_past_hist']/2)
-        self.num_future_hist = int(config['HISTORY']['num_future_hist']/2)
+        self.num_past_hist = config['HISTORY']['num_past_hist']
+        self.num_future_hist = config['HISTORY']['num_future_hist']
 
         self.static_layer = StaticLayerRasterizer(helper=self.helper, 
                                             layer_names=self.layers_list, 
@@ -100,19 +100,22 @@ class NuSceneDataset_CoverNet(Dataset):
             return len(self.val_set)
 
 
-    def get_label(self, trajectory_set, ground_truth):
-        return self.mean_pointwise_l2_distance(trajectory_set, ground_truth)
+    # def get_label(self, trajectory_set, ground_truth):
+    #     return self.mean_pointwise_l2_distance(trajectory_set, ground_truth)
 
 
-    def mean_pointwise_l2_distance(self, lattice: torch.Tensor, ground_truth: torch.Tensor) -> torch.Tensor:
-        """
-        Computes the index of the closest trajectory in the lattice as measured by l1 distance.
-        :param lattice: Lattice of pre-generated trajectories. Shape [num_modes, n_timesteps, state_dim]
-        :param ground_truth: Ground truth trajectory of agent. Shape [1, n_timesteps, state_dim].
-        :return: Index of closest mode in the lattice.
-        """
-        stacked_ground_truth = ground_truth.repeat(lattice.shape[0], 1, 1)
-        return torch.pow(lattice - stacked_ground_truth, 2).sum(dim=2).sqrt().mean(dim=1).argmin()
+
+    # def mean_pointwise_l2_distance(self, lattice: torch.Tensor, ground_truth: torch.Tensor) -> torch.Tensor:
+    #     """
+    #     Computes the index of the closest trajectory in the lattice as measured by l1 distance.
+    #     :param lattice: Lattice of pre-generated trajectories. Shape [num_modes, n_timesteps, state_dim]
+    #     :param ground_truth: Ground truth trajectory of agent. Shape [1, n_timesteps, state_dim].
+    #     :return: Index of closest mode in the lattice.
+    #     """
+    #     stacked_ground_truth = ground_truth.repeat(lattice.shape[0], 1, 1)
+    #     output = torch.pow(lattice - stacked_ground_truth, 2).sum(dim=2).sqrt().mean(dim=1).argmin() 
+
+    #     return output
 
     def __getitem__(self, idx):
         if self.train_mode:
@@ -131,19 +134,17 @@ class NuSceneDataset_CoverNet(Dataset):
         [ego_vel, ego_accel, ego_yawrate] = utils.data_filter([ego_vel, ego_accel, ego_yawrate])                # Filter unresonable data (make nan to zero)
         ego_states = np.array([[ego_vel, ego_accel, ego_yawrate]])
 
-        # GLOBAL history
-        future_poses_m = np.zeros((self.num_future_hist, 3))
+        ## GLOBAL history
         future = self.helper.get_future_for_agent(instance_token=ego_instance_token, sample_token=ego_sample_token, 
-                                            seconds=int(self.num_future_hist/2), in_agent_frame=False, just_xy=False)
+                                            seconds=int(self.num_future_hist/2), in_agent_frame=True, just_xy=True)
         num_future_mask = len(future)
-        future_poses_m[:len(future)] = utils.get_pose(future)
-
-        # Get label
-        gt_tensor = torch.Tensor(future_poses_m[:,:2]).unsqueeze(0)
-        trajectories_tensor = self.trajectories_set[:,:self.num_future_hist]
-        label = self.get_label(trajectories_tensor, gt_tensor)
 
 
+        ## Get label
+        gt_tensor = torch.Tensor(future).unsqueeze(0)
+        label = self.get_label(self.trajectories_set, gt_tensor)
+        print(self.trajectories_set.size())
+        print(label)
         #################################### Image processing ####################################
         img = self.input_repr.make_input_representation(instance_token=ego_instance_token, sample_token=ego_sample_token)
         if self.show_imgs:
@@ -151,23 +152,66 @@ class NuSceneDataset_CoverNet(Dataset):
             plt.imshow(img)
             plt.show()
 
-        img = torch.Tensor(img).permute(2,0,1).to(device=self.device)
+        # img = torch.Tensor(img).permute(2,0,1).to(device=self.device)
 
 
         return {'img'                  : img,                          # Type : torch.Tensor
-                'ego_cur_pos'          : ego_pose,                                                    # Type : np.array([global_x,globa_y,global_yaw])                        | Shape : (3, )
+                'ego_cur_pos'          : ego_pose,                     # Type : np.array([global_x,globa_y,global_yaw])                        | Shape : (3, )
                 'ego_state'            : ego_states,                   # Type : np.array([[vel,accel,yaw_rate]]) --> local(ego's coord)   |   Unit : [m/s, m/s^2, rad/sec]    
-                'future_global_ego_pos': future_poses_m,               # Type : np.array([global_x, global_y, global_yaw]) .. ground truth data
+                'future_local_ego_pos' : future,                       # Type : np.array([local_x, local_y, local_yaw]) .. ground truth data
                 'num_future_mask'      : num_future_mask,              # a number for masking future history
-                'label'                : label                         # calculated label data from preprocessed_trajectory_set using ground truth data
+                # 'label'                : label,                        # calculated label data from preprocessed_trajectory_set using ground truth data
                 }
 
     
-# if __name__ == '__main__':
-#     train_dataset = NuSceneDataset_CoverNet(train_mode=True, config_file_name='./covernet_config.json', verbose=True)
-#     print(len(train_dataset))
-#     print(train_dataset.__len__())
+if __name__ == '__main__':
+    ## train dataset
+    # train_dataset = NuSceneDataset_CoverNet(train_mode=True, config_file_name='./covernet_config.json', verbose=True)
+    # print(len(train_dataset))
+    # print(train_dataset.__len__())
 
-#     val_dataset = NuSceneDataset_CoverNet(train_mode=False, config_file_name='./covernet_config.json', verbose=True)
-#     print(len(val_dataset))
-#     print(val_dataset.__len__())
+    # val dataset
+    val_dataset = NuSceneDataset_CoverNet(train_mode=False, config_file_name='./covernet_config.json', verbose=True)
+    trajectories_set =torch.Tensor(pickle.load(open("./trajectory-sets/epsilon_8.pkl", 'rb')))
+
+    print(len(val_dataset))
+    for i in range(val_dataset.__len__()):
+        d= val_dataset.__getitem__(i)
+
+    # val_dataset.__getitem__(0)
+
+        # for plotting
+        xs = []
+        ys = []
+        for j in range(len(d['future_local_ego_pos'])):
+            xs.append(d['future_local_ego_pos'][j][0])
+            ys.append(d['future_local_ego_pos'][j][1])
+        xs = np.array(xs)
+        ys = np.array(ys)
+
+        xss = []
+        yss = []
+        label = trajectories_set[d['label'],:,:]
+        for j in range(len(label)):
+            xss.append(label[j][0])
+            yss.append(label[j][1])
+        xss = np.array(xss)
+        yss = np.array(yss)
+
+
+        fig, ax = plt.subplots(1,3, figsize = (10,10))
+        # Rasterized Image
+        ax[0].imshow(d['img'])
+        ax[0].set_title("Rasterized Image")
+        # Real ego future history
+        ax[1].set_title("Real ego future history")
+        ax[1].plot(xs, ys, 'bo')
+        ax[1].set_aspect('equal')
+        ax[1].set_xlim(-30, 30)
+        ax[1].set_ylim(-10, 50)
+        # Label of traj_set
+        ax[2].plot(xss,yss,'yo')
+        ax[2].set_aspect('equal')
+        ax[2].set_xlim(-30,30)
+        ax[2].set_ylim(-10,50)
+        ax[2].set_title("{}th anchor".format(d['label']))
